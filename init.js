@@ -1,3 +1,5 @@
+const TRUE_NORTH_OFFSET = 8.07;
+
 var gpsLocations = [];
 var compassHeadings = [];
 
@@ -6,15 +8,21 @@ var triangulated = null;
 
 var capture = false;
 
+var bearing = 0;
+
+
+
 Bangle.setGPSPower(1);
+Bangle.setCompassPower(1);
 
-Bangle.on('kill', function () {
-  // Turn off the compass and GPS
-  Bangle.setCompassPower(0);
-  Bangle.setGPSPower(0);
 
-  console.log("App terminated. Sensors turned off.");
-});
+// Bangle.on('kill', function () {
+//   // Turn off the compass and GPS
+//   Bangle.setCompassPower(0);
+//   Bangle.setGPSPower(0);
+
+//   console.log("App terminated. Sensors turned off.");
+// });
 
 
 Bangle.on('GPS-raw', function (nmea) {
@@ -60,6 +68,9 @@ function updateDisplay(myLat, myLon, triLat, triLon) {
   g.drawString(fromPoint.toFixed(2), 20, 40);
   g.drawString("" + measurements.length, 20, 60);
   g.flip();
+
+  let relativeBearing = calculateBearing(myLat, myLon, triLat, triLon) - bearing;
+  drawDotAtEdge(relativeBearing);
 }
 
 
@@ -77,9 +88,9 @@ function distance(lat1, lon1, lat2, lon2, r) {
 
 
 Bangle.on('mag', function (mag) {
+  bearing = (parseFloat(mag.heading) - TRUE_NORTH_OFFSET) * Math.PI / 180;
   if (capture && mag.heading !== undefined) {
-    // hard coded magnetic north offset - Adelaide, SA
-    compassHeadings.push(parseFloat(mag.heading) - 8.07);
+    compassHeadings.push(bearing);
   }
 });
 
@@ -87,26 +98,24 @@ function startSensors() {
   capture = true;
   gpsLocations = [];
   compassHeadings = [];
-  Bangle.setCompassPower(1);
   LED1.write(true);
 }
 
 function stopSensors() {
   LED1.write(false);
   capture = false;
-  Bangle.setCompassPower(0);
   updateTriangulation();
 }
 
 
 function updateTriangulation() {
-  var medianHeading = calculateMedian(compassHeadings) * Math.PI / 180;
+  var medianHeading = calculateMedian(compassHeadings);
   var medianLat = calculateMedian(gpsLocations.map(loc => loc.lat));
   var medianLon = calculateMedian(gpsLocations.map(loc => loc.lon));
   console.log("Median Heading: ", medianHeading);
   console.log("Median Location: Lat=", medianLat, " Lon=", medianLon);
 
-  writeToFile("gps.txt", JSON.stringify({ lat: medianLat, lon: medianLon, heading: medianHeading }));
+  writeToFile("gps.json", JSON.stringify({ lat: medianLat, lon: medianLon, heading: medianHeading }));
 
   measurements.push({ lat: medianLat, lon: medianLon, heading: medianHeading });
   triangulated = pairwiseTriangulation(measurements);
@@ -244,4 +253,45 @@ function writeToFile(filename, data) {
 
   // Optional: Console log for confirmation
   console.log("Data written to file: " + filename);
+}
+
+function drawDotAtEdge(angle, dotRadius = 3) {
+  const screenWidth = g.getWidth();
+  const screenHeight = g.getHeight();
+  const centerX = screenWidth / 2;
+  const centerY = screenHeight / 2;
+
+  // Adjust the angle to match the screen's orientation (top of the screen is 0 radians)
+  let screenAngle = angle - Math.PI / 2;
+
+  // Calculate the slope of the line
+  let slope = Math.tan(screenAngle);
+
+  // Calculate potential intersection points with screen edges
+  let edgeX, edgeY;
+
+  if (screenAngle >= -Math.PI / 2 && screenAngle <= Math.PI / 2) {
+    // Intersecting with right or left edge
+    edgeX = (screenAngle > 0) ? screenWidth - dotRadius : dotRadius;
+    edgeY = centerY - (centerX - edgeX) * slope;
+  } else {
+    // Intersecting with top or bottom edge
+    edgeY = (screenAngle > Math.PI / 2 || screenAngle < -Math.PI / 2) ? dotRadius : screenHeight - dotRadius;
+    edgeX = centerX + (centerY - edgeY) / slope;
+  }
+
+  // Draw the dot
+  g.fillCircle(edgeX, edgeY, dotRadius);
+}
+
+
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  let dl = lon2 - lon1;
+  let x = Math.cos(lat2) * Math.sin(dl);
+  let y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dl);
+  let bearingRad = Math.atan2(x, y);
+
+  // Normalize bearing to the range 0 to 2 * Math.PI
+  bearingRad = (bearingRad + 2.0 * Math.PI) % (2.0 * Math.PI);
+  return bearingRad;
 }
