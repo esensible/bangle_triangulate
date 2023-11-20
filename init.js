@@ -67,10 +67,15 @@ function updateDisplay(myLat, myLon, triLat, triLon) {
   g.setFont("6x8", 2);
   g.drawString(fromPoint.toFixed(2), 20, 40);
   g.drawString("" + measurements.length, 20, 60);
+
+  let relativeBearing = calculateBearing(triLat, triLon, myLat, myLon) - bearing;
+  drawDotAtEdge(relativeBearing);
+
   g.flip();
 
-  let relativeBearing = calculateBearing(myLat, myLon, triLat, triLon) - bearing;
-  drawDotAtEdge(relativeBearing);
+  if (capture) {
+    LED1.write(true);
+  }
 }
 
 
@@ -255,33 +260,36 @@ function writeToFile(filename, data) {
   console.log("Data written to file: " + filename);
 }
 
-function drawDotAtEdge(angle, dotRadius = 3) {
+function drawDotAtEdge(angle) {
   const screenWidth = g.getWidth();
   const screenHeight = g.getHeight();
-  const centerX = screenWidth / 2;
-  const centerY = screenHeight / 2;
+  const dotRadius = 3;
 
-  // Adjust the angle to match the screen's orientation (top of the screen is 0 radians)
-  let screenAngle = angle - Math.PI / 2;
+  // Adjust angle to start from the top of the screen
+  let adjustedAngle = (angle - Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
 
-  // Calculate the slope of the line
-  let slope = Math.tan(screenAngle);
-
-  // Calculate potential intersection points with screen edges
-  let edgeX, edgeY;
-
-  if (screenAngle >= -Math.PI / 2 && screenAngle <= Math.PI / 2) {
-    // Intersecting with right or left edge
-    edgeX = (screenAngle > 0) ? screenWidth - dotRadius : dotRadius;
-    edgeY = centerY - (centerX - edgeX) * slope;
+  // Calculate x, y coordinates based on the quadrant
+  let x, y;
+  if (adjustedAngle <= Math.PI / 4 || adjustedAngle > 7 * Math.PI / 4) {
+    // Top edge
+    x = screenWidth / 2 + (screenWidth / 2 - dotRadius) * Math.tan(adjustedAngle);
+    y = dotRadius;
+  } else if (adjustedAngle > Math.PI / 4 && adjustedAngle <= 3 * Math.PI / 4) {
+    // Right edge
+    x = screenWidth - dotRadius;
+    y = screenHeight / 2 - (screenWidth / 2 - dotRadius) * Math.tan(Math.PI / 2 - adjustedAngle);
+  } else if (adjustedAngle > 3 * Math.PI / 4 && adjustedAngle <= 5 * Math.PI / 4) {
+    // Bottom edge
+    x = screenWidth / 2 - (screenWidth / 2 - dotRadius) * Math.tan(adjustedAngle - Math.PI);
+    y = screenHeight - dotRadius;
   } else {
-    // Intersecting with top or bottom edge
-    edgeY = (screenAngle > Math.PI / 2 || screenAngle < -Math.PI / 2) ? dotRadius : screenHeight - dotRadius;
-    edgeX = centerX + (centerY - edgeY) / slope;
+    // Left edge
+    x = dotRadius;
+    y = screenHeight / 2 + (screenWidth / 2 - dotRadius) * Math.tan(3 * Math.PI / 2 - adjustedAngle);
   }
 
   // Draw the dot
-  g.fillCircle(edgeX, edgeY, dotRadius);
+  g.fillCircle(x, y, dotRadius);
 }
 
 
