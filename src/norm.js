@@ -1,6 +1,6 @@
 
 // See for explaination: https://www.movable-type.co.uk/scripts/latlong-vectors.html#triangulation
-function findIntersection(lat1, lon1, bearing1, lat2, lon2, bearing2) {
+export function findIntersection(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     const p1 = { lat: lat1, lon: lon1 };
     const p2 = { lat: lat2, lon: lon2 };
 
