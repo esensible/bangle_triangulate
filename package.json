@@ -1,0 +1,14 @@
+{
+  "name": "triangulate",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "dependencies": {
+    "install": "^0.13.0",
+    "npm": "^10.2.4",
+    "rollup": "^4.5.2"
+  }
+}
