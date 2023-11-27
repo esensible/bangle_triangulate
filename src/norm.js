@@ -1,14 +1,11 @@
 
 // See for explaination: https://www.movable-type.co.uk/scripts/latlong-vectors.html#triangulation
-export function findIntersection(lat1, lon1, bearing1, lat2, lon2, bearing2) {
-    const p1 = { lat: lat1, lon: lon1 };
-    const p2 = { lat: lat2, lon: lon2 };
-
+export function normIntersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     const point1 = toCartesian(lat1, lon1);
     const point2 = toCartesian(lat2, lon2);
 
-    const vector1 = greatCircleBearingVector(p1, bearing1);
-    const vector2 = greatCircleBearingVector(p2, bearing2);
+    const vector1 = greatCircleBearingVector(point1, bearing1);
+    const vector2 = greatCircleBearingVector(point2, bearing2);
 
     const greatCircle1 = crossProduct(point1, vector1);
     const greatCircle2 = crossProduct(point2, vector2);
@@ -51,10 +48,9 @@ function crossProduct(a, b) {
 
 
 function greatCircleBearingVector(point, bearing) {
-    const lat = point.lat;
-    const lon = point.lon;
-    const north = { x: -Math.sin(lat), y: Math.cos(lat), z: 0 };
-    const east = { x: -Math.sin(lon) * Math.cos(lat), y: -Math.cos(lon) * Math.cos(lat), z: Math.sin(lat) };
+    const NORTH = { x: 0, y: 0, z: 1 };
+    const east = crossProduct(NORTH, point);
+    const north = crossProduct(point, east);
     return {
         x: Math.cos(bearing) * north.x + Math.sin(bearing) * east.x,
         y: Math.cos(bearing) * north.y + Math.sin(bearing) * east.y,
