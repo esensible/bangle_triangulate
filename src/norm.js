@@ -51,10 +51,12 @@ function greatCircleBearingVector(point, bearing) {
     const NORTH = { x: 0, y: 0, z: 1 };
     const east = crossProduct(NORTH, point);
     const north = crossProduct(point, east);
+    const cosBearing = Math.cos(bearing);
+    const sinBearing = Math.sin(bearing);
     return {
-        x: Math.cos(bearing) * north.x + Math.sin(bearing) * east.x,
-        y: Math.cos(bearing) * north.y + Math.sin(bearing) * east.y,
-        z: Math.cos(bearing) * north.z + Math.sin(bearing) * east.z
+        x: cosBearing * north.x + sinBearing * east.x,
+        y: cosBearing * north.y + sinBearing * east.y,
+        z: cosBearing * north.z + sinBearing * east.z
     };
 }
 

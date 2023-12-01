@@ -1,4 +1,5 @@
-import { findIntersection } from './trig.js';
+import { intersect } from './trig.js';
+import { estimate } from './gradientDescent.js';
 
 const TRUE_NORTH_OFFSET = 8.07;
 
@@ -117,16 +118,27 @@ function stopSensors() {
 
 
 function updateTriangulation() {
-  var medianHeading = calculateMedian(compassHeadings);
-  var medianLat = calculateMedian(gpsLocations.map(loc => loc.lat));
-  var medianLon = calculateMedian(gpsLocations.map(loc => loc.lon));
-  console.log("Median Heading: ", medianHeading);
-  console.log("Median Location: Lat=", medianLat, " Lon=", medianLon);
+  // var medianHeading = calculateMedian(compassHeadings);
+  var heading = angularMean(compassHeadings);
+  var lat = calculateMedian(gpsLocations.map(loc => loc.lat));
+  var lon = calculateMedian(gpsLocations.map(loc => loc.lon));
+  console.log("Mean Heading: ", heading);
+  console.log("Median Location: Lat=", lat, " Lon=", lon);
 
-  writeToFile("gps.json", JSON.stringify({ lat: medianLat, lon: medianLon, heading: medianHeading }));
+  writeToFile("gps.json", JSON.stringify({ lat: lat, lon: lon, heading: heading }));
 
-  measurements.push({ lat: medianLat, lon: medianLon, heading: medianHeading });
-  triangulated = pairwiseTriangulation(measurements);
+  measurements.push({ lat: lat, lon: lon, heading: heading });
+  if (measurements.length < 2) {
+    return;
+  } else if (measurements.length == 2) {
+    triangulated = intersect(
+      measurements[0].lat, measurements[0].lon, measurements[0].heading,
+      measurements[1].lat, measurements[1].lon, measurements[1].heading
+    )
+  } else {
+    triangulated = estimate(measurements, triangulated);
+  }
+
   if (triangulated) {
     console.log("Triangulated: Lat=", triangulated.lat, " Lon=", triangulated.lon);
   }
@@ -154,7 +166,27 @@ function calculateMedian(array) {
 }
 
 
+function angularMean(bearings) {
+  var sumX = 0;
+  var sumY = 0;
 
+  bearings.forEach(function(bearing) {
+      sumX += Math.cos(bearing);
+      sumY += Math.sin(bearing);
+  });
+
+  var meanX = sumX / bearings.length;
+  var meanY = sumY / bearings.length;
+
+  var meanBearing = Math.atan2(meanY, meanX);
+
+  // Ensure the result is between 0 and 2π
+  if (meanBearing < 0) {
+      meanBearing += 2 * Math.PI;
+  }
+
+  return meanBearing;
+}
 
 
 
@@ -171,7 +203,7 @@ function pairwiseTriangulation(measurements) {
 
   for (let i = 0; i < measurements.length; i++) {
     for (let j = i + 1; j < measurements.length; j++) {
-      let intersection = findIntersection(
+      let intersection = intersect(
         measurements[i].lat, measurements[i].lon, measurements[i].heading,
         measurements[j].lat, measurements[j].lon, measurements[j].heading
       );

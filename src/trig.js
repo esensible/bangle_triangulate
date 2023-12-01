@@ -1,5 +1,5 @@
 
-export function trigIntersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
+export function intersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     // see www.edwilliams.org/avform.htm#Intersection
 
     const phi1 = lat1, lambda1 = lon1;
