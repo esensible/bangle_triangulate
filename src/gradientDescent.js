@@ -1,6 +1,6 @@
 
 const CONVERGENCE_THRESHOLD = 1e-8;
-const LEARNING_RATE = 1e-10;
+const LEARNING_RATE = 1e-12;
 
 export function estimate(observations, initial) {
     // Assuming make_j_prime is defined and returns a function
