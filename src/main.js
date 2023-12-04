@@ -1,31 +1,15 @@
-import { intersect } from './trig.js';
-import { estimate } from './gradientDescent.js';
+import { updateLocation, updateBearing, startCapture, stopCapture, triangulate } from './mainProc.js';
+import { updateDisplay } from './display.js';
+import { calcBearing } from './geoUtils.js';
 
+const CAPTURE_TIME = 3000;
 const TRUE_NORTH_OFFSET = 8.07;
+const capture = false;
 
-var gpsLocations = [];
-var compassHeadings = [];
+var LEDTimeout = null;
 
-var measurements = [];
-var triangulated = null;
-
-var capture = false;
-
-var bearing = 0;
-
-
-
-Bangle.setGPSPower(1);
+Bangle.setGPSPower(2);
 Bangle.setCompassPower(1);
-
-
-// Bangle.on('kill', function () {
-//   // Turn off the compass and GPS
-//   Bangle.setCompassPower(0);
-//   Bangle.setGPSPower(0);
-
-//   console.log("App terminated. Sensors turned off.");
-// });
 
 
 Bangle.on('GPS-raw', function (nmea) {
@@ -33,11 +17,6 @@ Bangle.on('GPS-raw', function (nmea) {
     var data = nmea.split(",");
 
     if (data[2] === 'A') {
-      LED1.write(true);
-      if (!capture) {
-        setTimeout(function () { LED1.write(false); }, 500);
-      }
-
       var lat = parseFloat(data[3]) / 100;
       var ns = data[4];
       var lon = parseFloat(data[5]) / 100;
@@ -49,174 +28,49 @@ Bangle.on('GPS-raw', function (nmea) {
       lat = lat * Math.PI / 180;
       lon = lon * Math.PI / 180;
 
-      if (triangulated) {
-        updateDisplay(lat, lon, triangulated.lat, triangulated.lon);
-      }
-
-      if (capture) {
-        gpsLocations.push({ lat, lon });
-      }
+      let state = updateLocation(lat, lon);
+      updateDisplay(state);
     }
   }
 });
 
-function updateDisplay(myLat, myLon, triLat, triLon) {
-  var earthRadius = 6371e3;
-  let fromPoint = distance(myLat, myLon, triLat, triLon, earthRadius);
-  console.log("distance: ", fromPoint);
-
-  // Update the display
-  g.clear();
-  g.setFont("6x8", 2);
-  g.drawString(fromPoint.toFixed(2), 20, 40);
-  g.drawString("" + measurements.length, 20, 60);
-
-  let relativeBearing = calculateBearing(triLat, triLon, myLat, myLon) - bearing;
-  drawDotAtEdge(relativeBearing);
-
-  g.flip();
-
-  if (capture) {
-    LED1.write(true);
-  }
-}
-
-
-function distance(lat1, lon1, lat2, lon2, r) {
-  const dlon = lon2 - lon1;
-  const dlat = lat2 - lat1;
-
-  const a = Math.pow(Math.sin(dlat / 2.0), 2) +
-    Math.cos(lat1) * Math.cos(lat2) *
-    Math.pow(Math.sin(dlon / 2.0), 2);
-
-  const c = 2.0 * Math.asin(Math.sqrt(a));
-  return r * c;
-}
-
+var xExtremes = null;
+var yExtremes = null;
+var zExtremes = null;
 
 Bangle.on('mag', function (mag) {
-  bearing = (parseFloat(mag.heading) - TRUE_NORTH_OFFSET) * Math.PI / 180;
-  if (capture && mag.heading !== undefined) {
-    compassHeadings.push(bearing);
-  }
+
+  // let heading = (parseFloat(mag.heading) - TRUE_NORTH_OFFSET) * Math.PI / 180;
+
+  var acc = Bangle.getAccel();
+
+  xExtremes = xExtremes === null ? [mag.x, mag.x] : [Math.min(xExtremes[0], mag.x), Math.max(xExtremes[1], mag.x)];
+  yExtremes = yExtremes === null ? [mag.y, mag.y] : [Math.min(yExtremes[0], mag.y), Math.max(yExtremes[1], mag.y)];
+  zExtremes = zExtremes === null ? [mag.z, mag.z] : [Math.min(zExtremes[0], mag.z), Math.max(zExtremes[1], mag.z)];
+
+  mX = mag.x - ((xExtremes[0] + xExtremes[1]) / 2);
+  mY = mag.y - ((yExtremes[0] + yExtremes[1]) / 2);
+  mZ = mag.z - ((zExtremes[0] + zExtremes[1]) / 2);
+
+  let bearing = calcBearing(acc.x, acc.y, acc.z, mX, mY, mZ);
+  // console.log(heading, bearing, acc.x, acc.y, acc.z, mX, mY, mZ);
+
+  let state = updateBearing(bearing);
+  updateDisplay(state);
 });
 
 
-function startSensors() {
-  capture = true;
-  gpsLocations = [];
-  compassHeadings = [];
-  LED1.write(true);
-}
-
-function stopSensors() {
-  LED1.write(false);
-  capture = false;
-  updateTriangulation();
-}
-
-
-function updateTriangulation() {
-  // var medianHeading = calculateMedian(compassHeadings);
-  var heading = angularMean(compassHeadings);
-  var lat = calculateMedian(gpsLocations.map(loc => loc.lat));
-  var lon = calculateMedian(gpsLocations.map(loc => loc.lon));
-  console.log("Mean Heading: ", heading);
-  console.log("Median Location: Lat=", lat, " Lon=", lon);
-
-  writeToFile("gps.json", JSON.stringify({ lat: lat, lon: lon, heading: heading }));
-
-  measurements.push({ lat: lat, lon: lon, heading: heading });
-  if (measurements.length < 2) {
-    return;
-  } else if (measurements.length == 2) {
-    triangulated = intersect(
-      measurements[0].lat, measurements[0].lon, measurements[0].heading,
-      measurements[1].lat, measurements[1].lon, measurements[1].heading
-    )
-  } else {
-    triangulated = estimate(measurements, triangulated);
-  }
-
-  if (triangulated) {
-    console.log("Triangulated: Lat=", triangulated.lat, " Lon=", triangulated.lon);
-  }
+function captureTimeout() {
+  stopCapture();
+  let state = triangulate();
+  updateDisplay(state);
+  writeToFile("gps.json", JSON.stringify(state));
 }
 
 setWatch(function () {
-  console.log("Button pressed. Recording data...");
-  startSensors();
-
-  setTimeout(stopSensors, 3000);
+  startCapture();
+  setTimeout(captureTimeout, CAPTURE_TIME);
 }, BTN, { repeat: true, edge: "rising" });
-
-
-
-
-
-function calculateMedian(array) {
-  array.sort(function (a, b) { return a - b; });
-  var middle = Math.floor(array.length / 2);
-  if (array.length % 2) {
-    return array[middle];
-  } else {
-    return (array[middle - 1] + array[middle]) / 2.0;
-  }
-}
-
-
-function angularMean(bearings) {
-  var sumX = 0;
-  var sumY = 0;
-
-  bearings.forEach(function(bearing) {
-      sumX += Math.cos(bearing);
-      sumY += Math.sin(bearing);
-  });
-
-  var meanX = sumX / bearings.length;
-  var meanY = sumY / bearings.length;
-
-  var meanBearing = Math.atan2(meanY, meanX);
-
-  // Ensure the result is between 0 and 2π
-  if (meanBearing < 0) {
-      meanBearing += 2 * Math.PI;
-  }
-
-  return meanBearing;
-}
-
-
-
-
-
-
-function pairwiseTriangulation(measurements) {
-  let lats = [];
-  let lons = [];
-
-  if (measurements.length <= 1) {
-    return null;
-  }
-
-  for (let i = 0; i < measurements.length; i++) {
-    for (let j = i + 1; j < measurements.length; j++) {
-      let intersection = intersect(
-        measurements[i].lat, measurements[i].lon, measurements[i].heading,
-        measurements[j].lat, measurements[j].lon, measurements[j].heading
-      );
-
-      if (intersection) {
-        lats.push(intersection.lat);
-        lons.push(intersection.lon);
-      }
-    }
-  }
-
-  return { lat: calculateMedian(lats), lon: calculateMedian(lons) };
-}
 
 
 function writeToFile(filename, data) {
@@ -225,51 +79,5 @@ function writeToFile(filename, data) {
 
   // Write data to the file
   file.write(data);
-
-  // Optional: Console log for confirmation
-  console.log("Data written to file: " + filename);
-}
-
-function drawDotAtEdge(angle) {
-  const screenWidth = g.getWidth();
-  const screenHeight = g.getHeight();
-  const dotRadius = 3;
-
-  // Adjust angle to start from the top of the screen
-  let adjustedAngle = (angle - Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
-
-  // Calculate x, y coordinates based on the quadrant
-  let x, y;
-  if (adjustedAngle <= Math.PI / 4 || adjustedAngle > 7 * Math.PI / 4) {
-    // Top edge
-    x = screenWidth / 2 + (screenWidth / 2 - dotRadius) * Math.tan(adjustedAngle);
-    y = dotRadius;
-  } else if (adjustedAngle > Math.PI / 4 && adjustedAngle <= 3 * Math.PI / 4) {
-    // Right edge
-    x = screenWidth - dotRadius;
-    y = screenHeight / 2 - (screenWidth / 2 - dotRadius) * Math.tan(Math.PI / 2 - adjustedAngle);
-  } else if (adjustedAngle > 3 * Math.PI / 4 && adjustedAngle <= 5 * Math.PI / 4) {
-    // Bottom edge
-    x = screenWidth / 2 - (screenWidth / 2 - dotRadius) * Math.tan(adjustedAngle - Math.PI);
-    y = screenHeight - dotRadius;
-  } else {
-    // Left edge
-    x = dotRadius;
-    y = screenHeight / 2 + (screenWidth / 2 - dotRadius) * Math.tan(3 * Math.PI / 2 - adjustedAngle);
-  }
-
-  // Draw the dot
-  g.fillCircle(x, y, dotRadius);
-}
-
-
-function calculateBearing(lat1, lon1, lat2, lon2) {
-  let dl = lon2 - lon1;
-  let x = Math.cos(lat2) * Math.sin(dl);
-  let y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dl);
-  let bearingRad = Math.atan2(x, y);
-
-  // Normalize bearing to the range 0 to 2 * Math.PI
-  bearingRad = (bearingRad + 2.0 * Math.PI) % (2.0 * Math.PI);
-  return bearingRad;
+  file.write('\n');
 }

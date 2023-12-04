@@ -26,11 +26,11 @@ export function intersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
 
     if (Math.sin(alpha1) == 0 && Math.sin(alpha2) == 0) {
         // console.log("infinite intersections");
-        return {lat: null, lon: null};
+        return [null, null];
     }
     if (Math.sin(alpha1) * Math.sin(alpha2) < 0) {
         // console.log("ambiguous intersection (antipodal/360°)");
-        return {lat: null, lon: null};
+        return [null, null];
     }
 
     const cosAlpha3 = -Math.cos(alpha1) * Math.cos(alpha2) + Math.sin(alpha1) * Math.sin(alpha2) * Math.cos(sigma12);
@@ -43,5 +43,5 @@ export function intersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     const lambda3 = lambda1 + deltaLambda13;
   
 
-    return { lat: phi3, lon: lambda3 }
+    return [phi3, lambda3];
 }

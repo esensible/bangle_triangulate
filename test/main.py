@@ -69,9 +69,9 @@ def main():
     observations = [(o['lat'], o['lon'], o['heading']) for o in json_data]
     # initial = [np.mean([o[0] for o in observations]), np.mean([o[1] for o in observations])]
     # print(initial)
-    # initial = intersect(*observations[0], *observations[1])
+    initial = intersect(*observations[0], *observations[-1])
     # print(initial)
-    initial = (-0.6033214053088205, 2.4149070729628566)
+    # initial = (-0.6033214053088205, 2.4149070729628566)
     # actual = np.radians([-34.944105, 138.6142589])
 
     estimates = list(zip(*estimate(observations, initial)))

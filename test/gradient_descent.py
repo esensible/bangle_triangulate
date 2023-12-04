@@ -1,7 +1,7 @@
 from math import sin
 from bearing_funcs import bearing, bearing_prime
 
-CONVERGENCE_THRESHOLD = 1e-8
+CONVERGENCE_THRESHOLD = 1e-9
 LEARNING_RATE = 1e-12
 
 

@@ -1,6 +1,6 @@
 
 // See for explaination: https://www.movable-type.co.uk/scripts/latlong-vectors.html#triangulation
-export function normIntersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
+export function intersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     const point1 = toCartesian(lat1, lon1);
     const point2 = toCartesian(lat2, lon2);
 
@@ -24,9 +24,9 @@ export function normIntersect(lat1, lon1, bearing1, lat2, lon2, bearing2) {
     const distB = distanceBetweenPoints(point1, intersection2);
 
     if (distA < distB) {
-        return { lat: latA, lon: lonA };
+        return [latA, lonA];
     } else {
-        return { lat: latB, lon: lonB };
+        return [latB, lonB];
     }
 }
 
