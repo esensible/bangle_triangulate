@@ -11,6 +11,10 @@ var LEDTimeout = null;
 Bangle.setGPSPower(2);
 Bangle.setCompassPower(1);
 
+Bangle.on('kill', () => {
+  Bangle.setGPSPower(0);
+  Bangle.setCompassPower(0);
+});
 
 Bangle.on('GPS-raw', function (nmea) {
   if (nmea.startsWith("$GNRMC")) {
