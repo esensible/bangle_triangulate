@@ -57,19 +57,32 @@ export function meanBearing(bearings) {
 }
 
 
+// Convert an NMEA ddmm.mmmm / dddmm.mmmm field to decimal degrees.
+export function nmeaToDegrees(field) {
+  var v = parseFloat(field);
+  var deg = Math.floor(v / 100);
+  return deg + (v - deg * 100) / 60;
+}
+
+
+// Tilt-compensated magnetic heading, radians clockwise from magnetic north in [0, 2pi).
+//
+// gX,gY,gZ: accelerometer reading in g (Bangle.getAccel(): z is about -1 when face up)
+// mX,mY,mZ: hard-iron corrected magnetometer reading
+//
+// This is the formulation used by the Bangle.js 2 "magnav" app (NXP AN4248 style),
+// which encodes the actual axis relationship between the Bangle.js 2 accelerometer
+// and magnetometer.  When the watch is level it reduces to atan2(-mX, mY), which
+// is exactly the firmware's own mag.heading.
 export function calcBearing(gX, gY, gZ, mX, mY, mZ) {
-  
-  // Calculate pitch and roll from the accelerometer data
-  const pitch = Math.atan2(gY, Math.sqrt(gX * gX + gZ * gZ));
-  const roll = Math.atan2(gX, Math.sqrt(gY * gY + gZ * gZ));
+  var phi = Math.atan2(-gX, -gZ);
+  var cosPhi = Math.cos(phi), sinPhi = Math.sin(phi);
+  var theta = Math.atan2(-gY, -gX * sinPhi - gZ * cosPhi);
+  var cosTheta = Math.cos(theta), sinTheta = Math.sin(theta);
 
-  // Tilt compensation for magnetometer
-  const MxPrime = mX * Math.cos(roll) + mZ * Math.sin(roll);
-  const MzPrime = -mX * Math.sin(roll) + mZ * Math.cos(roll);
-  const MyDoublePrime = mY * Math.cos(pitch) - MzPrime * Math.sin(pitch);
+  var xh = mY * cosTheta + mX * sinPhi * sinTheta + mZ * cosPhi * sinTheta;
+  var yh = mZ * sinPhi - mX * cosPhi;
 
-  // Calculate the heading
-  const heading = Math.atan2(MyDoublePrime, MxPrime) - Math.PI / 2.0;
-
+  var heading = Math.atan2(yh, xh);
   return heading < 0 ? heading + 2.0 * Math.PI : heading;
 }
