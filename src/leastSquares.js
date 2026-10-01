@@ -6,22 +6,30 @@
 // That is a 2x2 linear system: no step size, no iteration count, no convergence
 // threshold - the issues that made the previous gradient descent a no-op.
 //
-// Error model.  The perpendicular miss of ray i at the target is
+// Weighting.  The perpendicular miss of ray i at the target is
 //     range_i * (bearing error_i)  +  (observer position error)
-// so its variance is  range_i^2 * SIGMA_BEARING^2 + SIGMA_POSITION^2.
-// Dividing by that variance weights each ray by how trustworthy it is: a near
-// station's bearing is dominated by GPS error (5 m at 50 m is almost 6 degrees),
-// a distant station's by compass/aiming error.  Equivalently the angular error of
-// a station is  sqrt(SIGMA_BEARING^2 + (SIGMA_POSITION / range)^2),  which is why
-// near measurements are observed to be angularly worse than distant ones.
+// so its variance is  range_i^2 * sigma_bearing^2 + sigma_position^2.  Dividing by
+// that variance is the usual inverse-variance weight.  Only the ratio of the two
+// sigmas matters (a common factor cancels), so the weight is
+//     w_i = 1 / (range_i^2 + CROSSOVER_RANGE^2),   CROSSOVER_RANGE = sigma_position / sigma_bearing
+// CROSSOVER_RANGE is the range below which GPS position error dominates the
+// bearing error: 5 m of position error and 5 degrees of compass error give about
+// 57 m.  It is why near measurements are observed to be angularly worse than
+// distant ones.
+//
+// Simulated sensitivity (median error, 6 stations at 50..500 m):
+//   assumed crossover:        0     10     25     57    100    200   none
+//   compass 5 deg, GPS 5 m   12.7   12.7   12.7   12.8   12.9   13.6   17.1
+//   compass 3 deg, GPS 10 m  11.7   11.6   11.6   11.4   11.0   10.8   12.3
+//   compass 10 deg, GPS 3 m  23.1   23.1   23.1   23.2   23.5   25.4   32.9
+// i.e. anything from 0 (pure 1/range^2, "equal angular error everywhere") up to
+// about 100 m is equivalent; only not weighting at all is clearly worse.
 //
 // Range is not known until the target is estimated, so we solve unweighted first
 // and then re-solve with weights from the previous estimate a few times (IRLS).
-// Getting the two sigmas wrong by a factor of 3 costs only a few percent.
 
 const EARTH_RADIUS = 6371e3;
-const SIGMA_BEARING = 5 * Math.PI / 180; // compass + aiming error, radians
-const SIGMA_POSITION = 5;                // GPS error of a 3 s median, metres
+const CROSSOVER_RANGE = 50;  // metres, see above
 const REWEIGHT_PASSES = 3;
 
 // observations: array of [lat, lon, bearing] (radians, bearing clockwise from true north)
@@ -68,7 +76,7 @@ export function estimate(observations, passes) {
         for (var m = 0; m < observations.length; m++) {
             var dx = x - px[m], dy = y - py[m];
             var range2 = Math.max(dx * dx + dy * dy, 1);
-            weights.push(1 / (range2 * SIGMA_BEARING * SIGMA_BEARING + SIGMA_POSITION * SIGMA_POSITION));
+            weights.push(1 / (range2 + CROSSOVER_RANGE * CROSSOVER_RANGE));
         }
     }
 

@@ -34,9 +34,10 @@ Best results with
 1. After two or more measurements, the point is estimated by closed-form least squares in a local east/north plane:
    the point minimising the weighted sum of squared perpendicular distances to all the bearing rays (a 2x2 linear system)
    * With two measurements this is just the intersection of the two rays
-   * Each ray is weighted by `1 / (range^2 * SIGMA_BEARING^2 + SIGMA_POSITION^2)`: a near station's bearing is
-     dominated by GPS position error, a distant one's by compass/aiming error, so near measurements count for less.
-     Range is taken from the previous estimate and the solve is repeated a few times (`src/leastSquares.js`)
+   * Each ray is weighted by `1 / (range^2 + CROSSOVER_RANGE^2)`, the inverse of its miss variance at the target.
+     `CROSSOVER_RANGE` (about 50 m) is where GPS position error stops dominating the bearing error; the result is
+     insensitive to it anywhere from 0 to 100 m. Range is taken from the previous estimate and the solve is repeated
+     a few times (`src/leastSquares.js`)
    * Random aiming error averages down with more measurements, so take several from a wide spread of directions
 
 # To build
