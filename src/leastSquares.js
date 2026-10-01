@@ -65,8 +65,10 @@ export function estimate(observations, passes) {
             A += w * nx * nx; B += w * nx * ny; C += w * ny * ny;
             b1 += w * nx * d; b2 += w * ny * d;
         }
+        // degenerate (all rays parallel) when the normal matrix is rank 1; test relative to its
+        // scale so the result does not depend on the magnitude of the weights
         var det = A * C - B * B;
-        if (Math.abs(det) < 1e-9) return pass === 0 ? null : toLatLon(x, y, lat0, lon0, cosLat);
+        if (det <= 1e-10 * (A + C) * (A + C)) return pass === 0 ? null : toLatLon(x, y, lat0, lon0, cosLat);
 
         x = (C * b1 - B * b2) / det;
         y = (A * b2 - B * b1) / det;
