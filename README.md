@@ -16,7 +16,6 @@ To triangulate a point X
    * Another LED appears indicating direction to triangulated point
    * Distance to triangulated point is displayed
 1. Move to another point, repeat measurement process
-1. Triangulations will be much slower from this point because of the iterative optimization
 
 Notes:
 * Obviously this is all in metric, since we're not apes.
@@ -31,19 +30,30 @@ Best results with
 1. Compass measurements are first stabalized using tilt, roll calculated from accelerometer
 1. Pressing the button initiates capture of locations and (stablized) compass bearings
 1. After 3 seconds, the (circularized) mean bearing and median location is calculated
-1. After two such measurements, a simple intersection of the great circle planes is used to triangulate
-1. Subsequent measurements use numerical methods to solve the maximum likelihood estimator (MLE) under the assumption of bearings having a von Mises distribution e.g. ~ cos(theta_i - theta)
-   * The objective function is super non-linear so I have a very small learning rate i.e. 1e-10
+1. Magnetic bearings are converted to true bearings by adding the local declination (`DECLINATION` in `src/main.js`)
+1. After two or more measurements, the point is estimated by closed-form least squares in a local east/north plane:
+   the point minimising the weighted sum of squared perpendicular distances to all the bearing rays (a 2x2 linear system)
+   * With two measurements this is just the intersection of the two rays
+   * Each ray is weighted by `1 / (range^2 + CROSSOVER_RANGE^2)`, the inverse of its miss variance at the target.
+     `CROSSOVER_RANGE` (about 50 m) is where GPS position error stops dominating the bearing error; the result is
+     insensitive to it anywhere from 0 to 100 m. Range is taken from the previous estimate and the solve is repeated
+     a few times (`src/leastSquares.js`)
+   * Random aiming error averages down with more measurements, so take several from a wide spread of directions
 
 # To build
 
 1. npm install
 1. npm run build
-1. Get dist/triangulate.app.js onto your BangleJS device
+1. Get dist/bundle.js onto your BangleJS device
+1. `node test/estimate.test.mjs` runs the unit tests
 
 # Notes on calibration
 
 https://github.com/kriswiner/MPU6050/wiki/Simple-and-Effective-Magnetometer-Calibration
+
+The tilt compensation actually implemented in `calcBearing` follows the formulation used by the
+Bangle.js 2 `magnav` app (NXP AN4248 style), because it encodes the real axis relationship between
+the Bangle.js 2 accelerometer and magnetometer. The derivation below is the general idea.
 
 For a roll angle $\left(\phi\right)$ the rotation matrix is given by
 

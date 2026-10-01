@@ -1,8 +1,5 @@
-// This implementation is really just to test the display function
-
 import { median, meanBearing } from './geoUtils.js';
-import { intersect } from './norm.js';
-import { estimate } from './gradientDescent';
+import { estimate } from './leastSquares.js';
 
 var state = {
     location: null,
@@ -35,15 +32,8 @@ export function triangulate() {
     var lon = median(lons);
   
     state.measurements.push([lat, lon, bearing]);
-    if (state.measurements.length < 2) {
-      return state;
-    } else if (state.measurements.length == 2) {
-      state.triangulated = intersect(
-        state.measurements[0][0], state.measurements[0][1], state.measurements[0][2],
-        state.measurements[1][0], state.measurements[1][1], state.measurements[1][2]
-      )
-    } else {
-      state.triangulated = estimate(state.measurements, state.triangulated);
+    if (state.measurements.length >= 2) {
+      state.triangulated = estimate(state.measurements);
     }
 
     return state;
