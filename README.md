@@ -32,8 +32,11 @@ Best results with
 1. After 3 seconds, the (circularized) mean bearing and median location is calculated
 1. Magnetic bearings are converted to true bearings by adding the local declination (`DECLINATION` in `src/main.js`)
 1. After two or more measurements, the point is estimated by closed-form least squares in a local east/north plane:
-   the point minimising the sum of squared perpendicular distances to all the bearing rays (a 2x2 linear system)
+   the point minimising the weighted sum of squared perpendicular distances to all the bearing rays (a 2x2 linear system)
    * With two measurements this is just the intersection of the two rays
+   * Each ray is weighted by `1 / (range^2 * SIGMA_BEARING^2 + SIGMA_POSITION^2)`: a near station's bearing is
+     dominated by GPS position error, a distant one's by compass/aiming error, so near measurements count for less.
+     Range is taken from the previous estimate and the solve is repeated a few times (`src/leastSquares.js`)
    * Random aiming error averages down with more measurements, so take several from a wide spread of directions
 
 # To build

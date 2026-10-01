@@ -21,6 +21,27 @@ assert(Math.abs(nmeaToDegrees('00116.07202') - (1 + 16.07202 / 60)) < 1e-9);
 // parallel rays -> null
 assert.strictEqual(estimate([[lat0, lon0, 0], [lat0, lon0 + 1e-4, 0]]), null);
 
+// mixed ranges (50..500 m) with GPS and compass noise: the range-weighted fit must beat
+// the unweighted one, and its weights must favour the right stations
+{
+  let seed = 7; const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+  const randn = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  const errW = [], errU = [];
+  for (let t = 0; t < 400; t++) {
+    const obs = []; const base = rnd() * 360;
+    for (let i = 0; i < 6; i++) {
+      const az = (base + (i / 5) * 150) * D, r = 50 + rnd() * 450;
+      const p = off(-r * Math.cos(az), -r * Math.sin(az));
+      const q = [p[0] + randn() * 5 / R, p[1] + randn() * 5 / (R * Math.cos(lat0))];
+      obs.push([q[0], q[1], calculateBearing(p[0], p[1], lat0, lon0) + randn() * 5 * D]);
+    }
+    const w = estimate(obs), u = estimate(obs, 0);
+    errW.push(distance(w[0], w[1], lat0, lon0, R)); errU.push(distance(u[0], u[1], lat0, lon0, R));
+  }
+  errW.sort((a, b) => a - b); errU.sort((a, b) => a - b);
+  assert(errW[200] < errU[200] * 0.85, `weighted median ${errW[200].toFixed(1)} m vs unweighted ${errU[200].toFixed(1)} m`);
+}
+
 // noisy observations: using all N must beat using the first two
 {
   let seed = 1; const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
